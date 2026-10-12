@@ -31,6 +31,7 @@
     $("tabCreate").classList.toggle("active", mode === "create");
     $("tabJoin").classList.toggle("active", mode === "join");
     $("joinFields").classList.toggle("hidden", mode !== "join");
+    $("themeField").classList.toggle("hidden", mode !== "create");
     $("homeAction").textContent = mode === "create" ? "Create signal room" : "Join signal room";
     setNotice("");
   }
@@ -97,6 +98,7 @@
     try {
       const data = await request("create", {
         name: cleanName($("homeName").value),
+        theme: $("homeTheme").value,
         practice,
       });
       enterRoom(data);
@@ -266,7 +268,7 @@
 
     if (state.status === "lobby") {
       const activeCount = players.filter((player) => player.connected).length;
-      body = `<div class="card"><div class="lobby-head"><div class="room-badge"><span class="label">${state.practice ? "Solo practice" : "Room code"}</span><span class="room-code">${escapeHtml(state.roomCode)}</span><span class="subtle">${state.practice ? "Practice the full six-round loop on this device." : "Share this with your signal unit"}</span></div>${state.practice ? "" : `<div class="room-actions"><button id="copyRoom" class="btn secondary" type="button">Copy invite</button></div>`}</div><ul class="roster">${players.map((player) => `<li><span class="player-name"><i class="dot" style="${player.connected ? "" : "background:var(--dim);box-shadow:none"}"></i>${escapeHtml(player.name)}${player.id === state.hostPlayerId ? '<span class="host-tag">HOST</span>' : ""}</span><span class="subtle">${player.connected ? "Ready" : "Offline"}</span></li>`).join("")}</ul><div class="lobby-foot"><button id="leave" class="btn quiet" type="button">Main menu</button>${isHost ? `<button id="start" class="btn" type="button" ${activeCount < 2 && !state.practice ? "disabled" : ""}>${state.practice ? "Start practice" : activeCount < 2 ? "Waiting for another agent" : "Start game"}</button>` : '<button class="btn" type="button" disabled>Waiting for host</button>'}</div><div class="notice">${activeCount < 2 && !state.practice ? "At least two players are needed to begin." : ""}</div></div>`;
+      body = `<div class="card"><div class="lobby-head"><div class="room-badge"><span class="label">${state.practice ? "Solo practice" : "Room code"}</span><span class="room-code">${escapeHtml(state.roomCode)}</span><span class="subtle">${state.practice ? "Practice the full six-round loop on this device." : "Share this with your signal unit"}</span>${state.theme ? `<span class="subtle">Theme · ${escapeHtml(state.theme)}</span>` : ""}</div>${state.practice ? "" : `<div class="room-actions"><button id="copyRoom" class="btn secondary" type="button">Copy invite</button></div>`}</div><ul class="roster">${players.map((player) => `<li><span class="player-name"><i class="dot" style="${player.connected ? "" : "background:var(--dim);box-shadow:none"}"></i>${escapeHtml(player.name)}${player.id === state.hostPlayerId ? '<span class="host-tag">HOST</span>' : ""}</span><span class="subtle">${player.connected ? "Ready" : "Offline"}</span></li>`).join("")}</ul><div class="lobby-foot"><button id="leave" class="btn quiet" type="button">Main menu</button>${isHost ? `<button id="start" class="btn" type="button" ${activeCount < 2 && !state.practice ? "disabled" : ""}>${state.practice ? "Start practice" : activeCount < 2 ? "Waiting for another agent" : "Start game"}</button>` : '<button class="btn" type="button" disabled>Waiting for host</button>'}</div><div class="notice">${activeCount < 2 && !state.practice ? "At least two players are needed to begin." : ""}</div></div>`;
     } else if (state.status === "finished") {
       const sorted = [...players].sort((a, b) => b.score - a.score);
       const winnerNames = sorted.filter((player) => state.winners.includes(player.id)).map((player) => escapeHtml(player.name));

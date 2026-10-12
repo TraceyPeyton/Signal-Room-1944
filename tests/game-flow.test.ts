@@ -134,3 +134,53 @@ test("two players complete three rounds with clue-based scoring and a final winn
   assert.equal(firstGameScenarios.some((index) => nextGameScenarios.includes(index)), false);
   assert.equal(nextGuest.roomCode, nextHost.roomCode);
 });
+
+test("a themed room draws only scenarios from the chosen theme", async () => {
+  const store = new MemoryRoomStore();
+  let id = 0;
+  let token = 0;
+  let roomCode = 0;
+  const handler = createGameHandler({
+    store,
+    roundsPerGame: 3,
+    now: () => 2_000_000,
+    random: () => 0,
+    makeRoomCode: () => ["MARN23", "MARN45"][roomCode++] ?? `ROOM${roomCode}`,
+    makeId: () => `player-${++id}`,
+    makeToken: () => `session-${++token}`,
+  });
+  const response = await handler(new Request("http://localhost/.netlify/functions/game", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "create", name: "Sub", theme: "Maritime", practice: true }),
+  }));
+  const data = await response.json() as { session: { roomCode: string }; state: { theme: string }; error?: string };
+  assert.equal(response.ok, true, data.error ?? "request failed");
+  assert.equal(data.state.theme, "Maritime");
+  const order = store.room(data.session.roomCode)!.puzzleOrder;
+  assert.equal(order.length, 3);
+  assert.equal(order.every((index) => puzzles[index]!.theme === "Maritime"), true);
+});
+
+test("an unknown or absent theme falls back to Mixed", async () => {
+  const store = new MemoryRoomStore();
+  let id = 0;
+  let token = 0;
+  const handler = createGameHandler({
+    store,
+    roundsPerGame: 3,
+    now: () => 3_000_000,
+    random: () => 0,
+    makeRoomCode: () => "MIXD23",
+    makeId: () => `player-${++id}`,
+    makeToken: () => `session-${++token}`,
+  });
+  const response = await handler(new Request("http://localhost/.netlify/functions/game", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "create", name: "Nobody", theme: "Nonsense", practice: true }),
+  }));
+  const data = await response.json() as { state: { theme: string }; error?: string };
+  assert.equal(response.ok, true, data.error ?? "request failed");
+  assert.equal(data.state.theme, "Mixed");
+});

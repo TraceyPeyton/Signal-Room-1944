@@ -23,6 +23,7 @@ type ActiveRound = {
 export type GameRoom = {
   code: string;
   hostPlayerId: string;
+  theme: string;
   practice: boolean;
   status: "lobby" | "playing" | "roundOver" | "finished" | "closed";
   roundIndex: number;
@@ -71,12 +72,31 @@ type RequestBody = {
   name?: string;
   guess?: string;
   practice?: boolean;
+  theme?: string;
 };
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
   }
+}
+
+export const GAME_THEMES = ["Maritime", "Signals & Secrets", "Sky & Weather", "Land & Landmarks", "Gadgets & Machines"] as const;
+const MIXED_THEME = "Mixed";
+
+function normalizeTheme(value: unknown): string {
+  return typeof value === "string" && (GAME_THEMES as readonly string[]).includes(value) ? value : MIXED_THEME;
+}
+
+function themeKey(theme: string): string {
+  return theme.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "mixed";
+}
+
+function candidateIndices(bank: Puzzle[], theme: string): number[] {
+  const all = bank.map((_, index) => index);
+  if (theme === MIXED_THEME) return all;
+  const filtered = all.filter((index) => bank[index].theme === theme);
+  return filtered.length > 0 ? filtered : all;
 }
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -160,25 +180,31 @@ function advanceRoundState(room: GameRoom, now: number, bank: Puzzle[]): void {
   }
 }
 
-function shufflePuzzleOrder(length: number, count: number, random: () => number): number[] {
-  const order = Array.from({ length }, (_, index) => index);
+function shuffleIndices(indices: number[], random: () => number): number[] {
+  const order = indices.slice();
   for (let i = order.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
     [order[i], order[j]] = [order[j], order[i]];
   }
-  return order.slice(0, count);
+  return order;
+}
+
+function shufflePuzzleOrder(length: number, count: number, random: () => number): number[] {
+  return shuffleIndices(Array.from({ length }, (_, index) => index), random).slice(0, count);
 }
 
 async function reservePuzzleOrder(
   store: RoomStore,
-  length: number,
+  candidates: number[],
   count: number,
   random: () => number,
+  theme: string,
 ): Promise<number[]> {
-  const key = "meta:scenario-sequence";
+  const key = `meta:scenario-sequence:${themeKey(theme)}`;
+  const candidateSet = new Set(candidates);
   for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
     const previous = await store.getWithMetadata(key, { consistency: "strong", type: "json" });
-    const shuffled = shufflePuzzleOrder(length, length, random);
+    const shuffled = shuffleIndices(candidates, random);
     const previousSelection = previous?.data && typeof previous.data === "object"
       ? (previous.data as { previousPuzzleIndices?: unknown }).previousPuzzleIndices
       : undefined;
@@ -186,9 +212,9 @@ async function reservePuzzleOrder(
       ? (previous.data as { lastFirstIndex?: unknown }).lastFirstIndex
       : undefined;
     const excluded = new Set(Array.isArray(previousSelection)
-      ? previousSelection.filter((index): index is number => Number.isInteger(index) && index >= 0 && index < length)
+      ? previousSelection.filter((index): index is number => Number.isInteger(index) && candidateSet.has(index))
       : []);
-    if (typeof lastFirstIndex === "number" && Number.isInteger(lastFirstIndex) && lastFirstIndex >= 0 && lastFirstIndex < length) {
+    if (typeof lastFirstIndex === "number" && Number.isInteger(lastFirstIndex) && candidateSet.has(lastFirstIndex)) {
       excluded.add(lastFirstIndex);
     }
     const order = shuffled.filter((index) => !excluded.has(index)).slice(0, count);
@@ -240,6 +266,7 @@ function publicState(room: GameRoom, bank: Puzzle[]): Record<string, unknown> {
   return {
     roomCode: room.code,
     hostPlayerId: room.hostPlayerId,
+    theme: normalizeTheme(room.theme),
     practice: room.practice,
     status: room.status,
     roundIndex: room.roundIndex,
@@ -314,7 +341,10 @@ export function createGameHandler(options: GameApiOptions) {
   async function createRoom(body: RequestBody): Promise<Response> {
     if (bank.length < roundsPerGame || roundsPerGame < 1) throw new ApiError(500, "The game puzzle set is not configured correctly.");
     const timestamp = now();
-    const puzzleOrder = await reservePuzzleOrder(options.store, bank.length, roundsPerGame, random);
+    const theme = normalizeTheme(body.theme);
+    let candidates = candidateIndices(bank, theme);
+    if (candidates.length < roundsPerGame) candidates = bank.map((_, index) => index);
+    const puzzleOrder = await reservePuzzleOrder(options.store, candidates, roundsPerGame, random, theme);
     const player: Player = {
       id: makeId(),
       name: cleanName(body.name, body.practice ? "Agent" : "Host"),
@@ -329,6 +359,7 @@ export function createGameHandler(options: GameApiOptions) {
       const room: GameRoom = {
         code,
         hostPlayerId: player.id,
+        theme,
         practice: body.practice === true,
         status: "lobby",
         roundIndex: 0,
@@ -398,7 +429,9 @@ export function createGameHandler(options: GameApiOptions) {
         if (current.status !== "lobby") throw new ApiError(409, "This game has already started.");
         if (!current.practice && activePlayers(current).length < 2) throw new ApiError(409, "At least two players are needed to begin.");
         if (current.puzzleOrder.length < current.roundCount) {
-          current.puzzleOrder = shufflePuzzleOrder(bank.length, current.roundCount, random);
+          let candidates = candidateIndices(bank, normalizeTheme(current.theme));
+          if (candidates.length < current.roundCount) candidates = bank.map((_, index) => index);
+          current.puzzleOrder = shuffleIndices(candidates, random).slice(0, current.roundCount);
         }
         current.roundIndex = 0;
         startRound(current, now());

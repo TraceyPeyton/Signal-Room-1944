@@ -4,7 +4,7 @@ Signal Room is a browser codebreaking game for 2–8 players. The host creates a
 
 ## Gameplay
 
-- Six transmissions are shuffled from a 16-scenario collection for each game. Consecutive games use different scenarios, so a word cannot repeat between back-to-back games.
+- The host picks a theme when opening a room — Maritime, Signals & Secrets, Sky & Weather, Land & Landmarks, Gadgets & Machines, or Mixed. Six transmissions are then drawn from a 67-scenario collection (each theme has at least thirteen). Consecutive games of the same theme use different scenarios, so a word cannot repeat between back-to-back games.
 - A clue appears every 20 seconds. Correct answers score 4, 3, 2, or 1 points based on clues revealed, plus 2 points for the first solver of each round.
 - Incorrect guesses lock that player out for three seconds.
 - The host advances between rounds. The final board declares a winner or shared victory.
