@@ -10,14 +10,25 @@ Signal Room is a browser codebreaking game for 2–8 players. The host creates a
 - The host advances between rounds. The final board declares a winner or shared victory.
 - Solo practice uses the same scoring and round flow.
 
+## Publish from GitHub (continuous deploy)
+
+Netlify builds and deploys automatically on every push once the repository is connected:
+
+1. Sign in to Netlify and choose **Add new site → Import an existing project**.
+2. Pick **GitHub** and authorize access, then select this repository.
+3. Netlify reads the included `netlify.toml` and pre-fills the build command (`npm run build`), publish directory (`dist`), and functions directory (`netlify/functions`). Leave them as detected.
+4. Click **Deploy site**. Every push to `main` now redeploys, and each pull request gets its own deploy preview.
+
 ## Publish with Netlify Drop
+
+For a one-off deploy without connecting the repository:
 
 1. Sign in to Netlify and open the Drag and Drop publisher.
 2. Upload `netlify-ready-game.zip` (or drop the extracted project folder).
 3. Netlify reads the included `netlify.toml`, builds the static page, and packages `netlify/functions/game.ts`.
 4. Open the resulting site URL and share it with players.
 
-The game uses a standard Netlify Function and a strongly consistent Netlify Blobs store. Blobs are provisioned by Netlify; the project needs no GitHub connection, credentials, environment variables, API keys, or separate database setup. The browser calls `/.netlify/functions/game` directly. Room updates use conditional writes so two players cannot silently overwrite one another's scores.
+The game uses a standard Netlify Function and a strongly consistent Netlify Blobs store. Blobs are provisioned by Netlify, so the project needs no credentials, environment variables, API keys, or separate database setup. The browser calls `/.netlify/functions/game` directly. Room updates use conditional writes so two players cannot silently overwrite one another's scores.
 
 ## Project contents
 
