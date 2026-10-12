@@ -206,8 +206,12 @@ async function reservePuzzleOrder(
     }
 
     const etag = previous.etag ?? (await store.getMetadata?.(key, { consistency: "strong" }))?.etag;
-    if (!etag) throw new ApiError(500, "Could not safely choose a new scenario. Please try again.");
-    const saved = await store.setJSON(key, next, { onlyIfMatch: etag });
+    // The Netlify Blobs store returns an etag for conditional (compare-and-swap) writes.
+    // The local `netlify dev` blobs server omits etags on reads, so fall back to an
+    // unconditional write there; production always provides an etag and stays safe.
+    const saved = etag
+      ? await store.setJSON(key, next, { onlyIfMatch: etag })
+      : await store.setJSON(key, next, {});
     if (saved.modified) return order;
   }
   throw new ApiError(409, "Scenarios are being selected at the same time. Please try again.");
@@ -292,8 +296,10 @@ export function createGameHandler(options: GameApiOptions) {
       const result = await change(room);
       if (JSON.stringify(room) === before) return { room, result };
       const etag = entry.etag ?? (await options.store.getMetadata?.(keyFor(code), { consistency: "strong" }))?.etag;
-      if (!etag) throw new ApiError(500, "The room could not be updated safely. Please try again.");
-      const saved = await options.store.setJSON(keyFor(code), room, { onlyIfMatch: etag });
+      // See reservePuzzleOrder: conditional write in production, unconditional under local dev.
+      const saved = etag
+        ? await options.store.setJSON(keyFor(code), room, { onlyIfMatch: etag })
+        : await options.store.setJSON(keyFor(code), room, {});
       if (saved.modified) return { room, result };
     }
     throw new ApiError(409, "The room changed at the same time. Please try again.");
