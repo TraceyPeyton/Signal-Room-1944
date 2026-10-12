@@ -1,0 +1,23 @@
+{
+  "name": "signal-room-netlify",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "tsx --test tests/game-flow.test.ts",
+    "verify:build": "netlify build"
+  },
+  "dependencies": {
+    "@netlify/blobs": "10.5.0",
+    "@netlify/functions": "^4.2.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^23.5.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

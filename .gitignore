@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.netlify/
+.netlify-local-appdata/
+.cache/
+*.log
+netlify-ready-game.zip
